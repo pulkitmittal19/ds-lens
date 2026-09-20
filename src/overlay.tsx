@@ -14,6 +14,7 @@ import { createPortal } from 'react-dom'
 import { Lens } from './inspect'
 import { toHex } from './color'
 import { format } from './annotate'
+import { distanceBetween, formatDistance, type Distance } from './measure'
 import { createGlobal } from './agent'
 import type { DsLensConfig, Inspection, Reading } from './types'
 
@@ -172,6 +173,50 @@ function Chip({ locked, peeking, copied, accent, onToggle }: {
   )
 }
 
+/* Gap lines, drawn as positioned divs rather than an SVG overlay: a 1px div
+   is exactly 1px, and an SVG stroke straddles the coordinate and renders soft
+   on a fractional boundary. For a ruler that is the wrong trade. */
+function Rulers({ a, b, accent }: { a: DOMRect; b: DOMRect; accent: string }) {
+  const d: Distance = distanceBetween(a, b)
+  const cap = (x: number, y: number, vertical: boolean) => ({
+    position: 'fixed' as const, left: vertical ? x - 4 : x - 0.5, top: vertical ? y - 0.5 : y - 4,
+    width: vertical ? 8 : 1, height: vertical ? 1 : 8, background: accent, zIndex: 2147483645,
+  })
+  return (
+    <>
+      <div style={{
+        position: 'fixed', left: a.x, top: a.y, width: a.width, height: a.height,
+        outline: `1px dashed ${accent}`, outlineOffset: 1, pointerEvents: 'none', zIndex: 2147483645,
+      }} />
+      {d.gaps.map(g => {
+        const horizontal = g.axis === 'x'
+        return (
+          <div key={g.axis}>
+            <div style={{
+              position: 'fixed', zIndex: 2147483645, background: accent,
+              left: horizontal ? g.from.x : g.from.x - 0.5,
+              top: horizontal ? g.from.y - 0.5 : g.from.y,
+              width: horizontal ? g.distance : 1,
+              height: horizontal ? 1 : g.distance,
+            }} />
+            <div style={cap(g.from.x, g.from.y, horizontal)} />
+            <div style={cap(g.to.x, g.to.y, horizontal)} />
+            <span style={{
+              position: 'fixed', zIndex: 2147483646,
+              left: horizontal ? (g.from.x + g.to.x) / 2 : g.from.x + 8,
+              top: horizontal ? g.from.y - 22 : (g.from.y + g.to.y) / 2 - 8,
+              transform: horizontal ? 'translateX(-50%)' : 'none',
+              background: accent, color: '#FFFFFF', borderRadius: 5,
+              padding: '2px 6px', font: `500 11px/1.2 ${INK.sans}`, whiteSpace: 'nowrap',
+              pointerEvents: 'none',
+            }}>{Math.round(g.distance * 10) / 10}</span>
+          </div>
+        )
+      })}
+    </>
+  )
+}
+
 function Pill({ children, tone }: { children: ReactNode; tone?: 'bad' }) {
   return (
     <span style={{
@@ -242,8 +287,8 @@ function Row({ name, value, verdict, ok, accent, swatch }: {
 const tail = (text: string, max = 46) =>
   text.length <= max ? text : '…' + text.slice(-(max - 1))
 
-function Panel({ data, at, accent }: {
-  data: Inspection; at: { x: number; y: number }; accent: string
+function Panel({ data, at, accent, distance }: {
+  data: Inspection; at: { x: number; y: number }; accent: string; distance?: Distance
 }) {
   const W = 322
   const left = Math.min(at.x + 18, window.innerWidth - W - 12)
@@ -297,6 +342,14 @@ function Panel({ data, at, accent }: {
         )
       })}
 
+      {distance && (
+        <Row
+          name="Gap" accent={accent} ok
+          value={formatDistance(distance)}
+          verdict={distance.aligned.length ? `aligned ${distance.aligned.join(' ')}` : ''}
+        />
+      )}
+
       {origin && !origin.layer && (
         <div style={{ marginTop: 7 }}>
           <Pill tone="bad">unlayered</Pill>
@@ -328,6 +381,11 @@ export function DsLens(props: DsLensProps = {}) {
   const [peek, setPeek] = useState(false)
   const on = locked || peek
   const [found, setFound] = useState<Inspection | null>(null)
+  /* The pinned element, not its rectangle. A rect goes stale the moment the
+     page scrolls or reflows; the element does not, so the ruler is measured
+     fresh on every render. */
+  const [pinned, setPinned] = useState<Element | null>(null)
+  const hovered = useRef<Element | null>(null)
   const [at, setAt] = useState({ x: 0, y: 0 })
   const [copied, setCopied] = useState(false)
   /* Read once at mount: agentation's accent if it is on the page, else ours.
@@ -371,15 +429,25 @@ export function DsLens(props: DsLensProps = {}) {
   }, [])
 
   useEffect(() => {
-    if (!on) { setFound(null); return }
+    if (!on) { setFound(null); setPinned(null); return }
 
     const move = (e: MouseEvent) => {
       const el = document.elementFromPoint(e.clientX, e.clientY)
       if (skip(el)) return
+      hovered.current = el!
       setAt({ x: e.clientX, y: e.clientY })
       setFound(lens.current!.read(el!))
     }
-    const key = (e: KeyboardEvent) => { if (e.key === 'Escape') setLocked(false) }
+    const key = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') { setPinned(null); setLocked(false); return }
+      /* M pins the element under the cursor as the thing to measure from —
+         the same gesture as holding a modifier over a second element in a
+         design tool. Pressing it again, or Escape, lets go. */
+      if (e.key === 'm' || e.key === 'M') {
+        e.preventDefault()
+        setPinned(current => (current ? null : hovered.current))
+      }
+    }
     const click = (e: MouseEvent) => {
       if (!locked) return                       // peeking never steals a click
       if (skip(e.target as Element)) return
@@ -410,6 +478,13 @@ export function DsLens(props: DsLensProps = {}) {
 
   if (typeof document === 'undefined') return null
 
+  /* Both rectangles read fresh, from the elements rather than from the stored
+     Inspection: Inspection.box is a plain object with no top/right/bottom/left,
+     and it is a snapshot besides. */
+  const measuring = pinned && hovered.current && pinned !== hovered.current
+    ? { a: pinned.getBoundingClientRect(), b: hovered.current.getBoundingClientRect() }
+    : null
+
   return createPortal(
     <div data-ds-lens="">
       <Chip
@@ -427,7 +502,13 @@ export function DsLens(props: DsLensProps = {}) {
             left: found.box.x, top: found.box.y, width: found.box.width, height: found.box.height,
             outline: `1px solid ${accent}`, background: 'rgba(0,135,255,.12)',
           }} />
-          <Panel data={found} at={at} accent={accent} />
+          {measuring && (
+            <Rulers a={measuring.a} b={measuring.b} accent={accent} />
+          )}
+          <Panel
+            data={found} at={at} accent={accent}
+            distance={measuring ? distanceBetween(measuring.a, measuring.b) : undefined}
+          />
         </>
       )}
     </div>,

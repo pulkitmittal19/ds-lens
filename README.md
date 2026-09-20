@@ -71,6 +71,18 @@ A 44px button you can drag anywhere; its position is remembered.
 A copied reading is four lines, not the raw object — the size it is actually
 read at. Hold <kbd>⇧</kbd> while clicking for the full JSON instead.
 
+**Measuring between two elements** — press <kbd>M</kbd> over one element to pin
+it, then move to another. The gap is drawn on the page and shown in the panel,
+edge to edge, per axis. Shared edges are called out too:
+
+```
+Gap     31px                      aligned left
+```
+
+<kbd>M</kbd> again or <kbd>Esc</kbd> lets go. Per axis rather than one number,
+because two elements can sit 40px apart horizontally and overlap vertically —
+reporting a single figure there would be a guess about which was meant.
+
 ```
 "Aisha Rahman"  ·  div.convo-row > div > div > span
 Type    14px / 600 / normal       ✗ nearest text-paragraph-md

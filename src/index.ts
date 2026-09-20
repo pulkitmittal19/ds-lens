@@ -14,5 +14,6 @@ export { enrich, measure, describe, format, type AnnotationLike, type EnrichOpti
 export { buildTokenTable, tokenFor, type TokenTable } from './tokens'
 export { winningRule, specificity, invalidateLayerOrder } from './cascade'
 export { discoverRoles, matchRole, nearestRole, type Role } from './roles'
+export { distanceBetween, formatDistance, type Distance, type Gap } from './measure'
 export type { Audit, DsLensConfig, Inspection, Origin, Reading, Verdict } from './types'
-export const VERSION = '0.1.2'
+export const VERSION = '0.1.3'
