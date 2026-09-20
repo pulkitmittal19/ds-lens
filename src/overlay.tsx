@@ -16,6 +16,7 @@ import { toHex } from './color'
 import { format } from './annotate'
 import { distanceBetween, formatDistance, type Distance } from './measure'
 import { createGlobal } from './agent'
+import { VERSION } from './version'
 import type { DsLensConfig, Inspection, Reading } from './types'
 
 /* Agentation's palette, measured from its own toolbar rather than guessed:
@@ -534,7 +535,7 @@ export function DsLens(props: DsLensProps = {}) {
   useEffect(() => {
     mounted.current = true
     if (!exposeGlobal) return
-    window[globalName] = createGlobal(lens.current!, '0.1.0')
+    window[globalName] = createGlobal(lens.current!, VERSION)
     return () => { delete window[globalName] }
   }, [exposeGlobal, globalName])
 
