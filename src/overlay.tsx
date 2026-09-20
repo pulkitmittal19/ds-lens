@@ -173,7 +173,13 @@ function Chip({ locked, peeking, copied, accent, onToggle }: {
   )
 }
 
-/* Gap lines, drawn as positioned divs rather than an SVG overlay: a 1px div
+/* Every part of this is pointer-events:none, and that is not tidiness. A ruler
+   is drawn across the gap between two elements — exactly the path the cursor
+   travels to reach the second one. A line that can be hit-tested catches the
+   cursor there, elementFromPoint returns the ruler, tracking freezes, and the
+   whole gesture reads as broken.
+
+   Gap lines, drawn as positioned divs rather than an SVG overlay: a 1px div
    is exactly 1px, and an SVG stroke straddles the coordinate and renders soft
    on a fractional boundary. For a ruler that is the wrong trade. */
 function Rulers({ a, b, accent }: { a: DOMRect; b: DOMRect; accent: string }) {
@@ -181,6 +187,7 @@ function Rulers({ a, b, accent }: { a: DOMRect; b: DOMRect; accent: string }) {
   const cap = (x: number, y: number, vertical: boolean) => ({
     position: 'fixed' as const, left: vertical ? x - 4 : x - 0.5, top: vertical ? y - 0.5 : y - 4,
     width: vertical ? 8 : 1, height: vertical ? 1 : 8, background: accent, zIndex: 2147483645,
+    pointerEvents: 'none' as const,
   })
   return (
     <>
@@ -193,7 +200,7 @@ function Rulers({ a, b, accent }: { a: DOMRect; b: DOMRect; accent: string }) {
         return (
           <div key={g.axis}>
             <div style={{
-              position: 'fixed', zIndex: 2147483645, background: accent,
+              position: 'fixed', zIndex: 2147483645, background: accent, pointerEvents: 'none',
               left: horizontal ? g.from.x : g.from.x - 0.5,
               top: horizontal ? g.from.y - 0.5 : g.from.y,
               width: horizontal ? g.distance : 1,
@@ -285,14 +292,35 @@ const LABEL: Record<string, string> = {
 }
 const label = (p: string) => LABEL[p] ?? (p.startsWith('padding') ? 'Padding' : p)
 
-/** Padding reads as one line when all four sides agree, four when they differ. */
+/**
+ * Padding collapses to one row, written as CSS shorthand.
+ *
+ * Four separate rows is three too many, and the half-collapsed version was
+ * worse: two rows both reading `Padding  8px` with nothing to say which sides
+ * they were. Shorthand is the notation the value would be written in anyway —
+ * `8px`, `8px 12px`, or all four when they genuinely differ.
+ */
 function foldPadding(readings: Reading[]): Reading[] {
-  const sides = readings.filter(r => r.property.startsWith('padding'))
-  if (sides.length !== 4) return readings
-  const rest = readings.filter(r => !r.property.startsWith('padding'))
-  const same = sides.every(s => s.value === sides[0].value && s.verdict.status === sides[0].verdict.status)
-  if (!same) return readings
-  return [...rest, { ...sides[0], property: 'padding' }]
+  const sides = ['padding-top', 'padding-right', 'padding-bottom', 'padding-left']
+  const found = sides.map(side => readings.find(r => r.property === side))
+  if (!found.some(Boolean)) return readings
+
+  const value = (r?: Reading) => r?.value ?? '0px'
+  const [top, right, bottom, left] = found.map(value)
+  const shorthand =
+    top === right && right === bottom && bottom === left ? top
+    : top === bottom && left === right ? `${top} ${right}`
+    : `${top} ${right} ${bottom} ${left}`
+
+  /* One raw side makes the whole declaration raw — the row is reporting a
+     single value now, and it cannot be half on the system. */
+  const present = found.filter(Boolean) as Reading[]
+  const verdict = present.every(r => r.verdict.status === 'token') ? present[0].verdict : { status: 'raw' as const }
+
+  return [
+    ...readings.filter(r => !r.property.startsWith('padding')),
+    { property: 'padding', value: shorthand, verdict, origin: present[0].origin },
+  ]
 }
 
 function Row({ name, value, verdict, ok, accent, swatch }: {
@@ -410,6 +438,10 @@ export function DsLens(props: DsLensProps = {}) {
      fresh on every render. */
   const [pinned, setPinned] = useState<Element | null>(null)
   const hovered = useRef<Element | null>(null)
+  /* The browser's native tooltip fires on any element with a `title` and
+     renders above everything, including a gap label. One element's title is
+     held aside while the cursor is on it, and given straight back. */
+  const muted = useRef<{ el: Element; title: string } | null>(null)
   const [at, setAt] = useState({ x: 0, y: 0 })
   const [copied, setCopied] = useState(false)
   /* Read once at mount: agentation's accent if it is on the page, else ours.
@@ -427,14 +459,26 @@ export function DsLens(props: DsLensProps = {}) {
     return () => { delete window[globalName] }
   }, [exposeGlobal, globalName])
 
+  /* Keyed on the contents, not the array.
+     `overlaySelectors = []` in the destructure is a fresh array on every
+     render, so depending on it made `skip` a new function every render, which
+     made the inspect effect tear down and re-attach three document listeners
+     on every mouse move. Worse, its cleanup restored the tooltip it had just
+     suppressed, so muting never survived a single frame. */
+  const overlayRoots = useMemo(
+    () => [...OVERLAY_ROOTS, ...overlaySelectors],
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [overlaySelectors.join('|')],
+  )
+
   /* True for ds-lens's own UI and for any other tool's floating UI. Those
      elements are never inspected and never have their clicks intercepted. */
   const skip = useCallback((el: Element | null) => {
     if (!el) return true
-    return [...OVERLAY_ROOTS, ...overlaySelectors].some(sel => {
+    return overlayRoots.some(sel => {
       try { return !!el.closest(sel) } catch { return false }
     })
-  }, [overlaySelectors])
+  }, [overlayRoots])
 
   useEffect(() => {
     const down = (e: KeyboardEvent) => { if (e.key === 'Alt') setPeek(true) }
@@ -458,6 +502,20 @@ export function DsLens(props: DsLensProps = {}) {
     const move = (e: MouseEvent) => {
       const el = document.elementFromPoint(e.clientX, e.clientY)
       if (skip(el)) return
+      /* The tooltip belongs to the nearest ANCESTOR carrying a title, not to
+         whatever leaf the cursor happens to land on — a button's title fires
+         while the cursor is over the icon inside it. */
+      const titled = el?.closest('[title]') ?? null
+      const previous = muted.current
+      if (previous && previous.el !== titled) {
+        previous.el.setAttribute('title', previous.title)
+        muted.current = null
+      }
+      if (titled && titled !== previous?.el) {
+        const title = titled.getAttribute('title')!
+        muted.current = { el: titled, title }
+        titled.removeAttribute('title')
+      }
       hovered.current = el!
       setAt({ x: e.clientX, y: e.clientY })
       setFound(lens.current!.read(el!))
@@ -495,6 +553,12 @@ export function DsLens(props: DsLensProps = {}) {
     document.addEventListener('keyup', keyUp, true)
     document.addEventListener('click', click, true)
     return () => {
+      /* Whatever was held aside goes back, even if the inspector is torn down
+         mid-hover — a page must not be left missing a tooltip. */
+      if (muted.current) {
+        muted.current.el.setAttribute('title', muted.current.title)
+        muted.current = null
+      }
       document.removeEventListener('mousemove', move, true)
       document.removeEventListener('keydown', key, true)
       document.removeEventListener('keyup', keyUp, true)
