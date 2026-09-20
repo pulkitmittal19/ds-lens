@@ -1,6 +1,6 @@
 {
   "name": "ds-lens",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Hover any element and see whether it is actually on your design system — which token, which type role, and which cascade layer won.",
   "keywords": [
     "design-system",

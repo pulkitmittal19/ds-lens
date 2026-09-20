@@ -13,6 +13,7 @@
  * console, an MCP browser tool, a bookmarklet. No transport, no protocol.
  */
 import { Lens } from './inspect'
+import { describe as describeReading, enrich as enrichAnnotation, type AnnotationLike } from './annotate'
 import type { Audit, Inspection } from './types'
 
 export interface DsLensGlobal {
@@ -31,6 +32,13 @@ export interface DsLensGlobal {
   audit(options?: { root?: string; properties?: string[] }): Audit
   /** Every type role ds-lens knows about, to sanity-check configuration. */
   roles(): Array<{ name: string; fontSize: string; fontWeight?: string; lineHeight?: string }>
+  /**
+   * An annotation from any feedback tool, plus what its element measures.
+   * Accepts `elementPath`, `selector`, `element` or `x`/`y`.
+   */
+  enrich<T extends AnnotationLike>(annotation: T): T & { dsLens: Inspection | null }
+  /** A reading as one readable line, for a comment or a chat message. */
+  describe(found: Inspection | null): string
   /** Re-read the stylesheet after a theme switch or an HMR update. */
   refresh(): void
 }
@@ -52,6 +60,8 @@ export function createGlobal(lens: Lens, version: string): DsLensGlobal {
       return lens.audit({ root: root ?? document.body, properties: options.properties })
     },
     roles: () => lens.knownRoles(),
+    enrich: (annotation) => enrichAnnotation(annotation, { lens }),
+    describe: (found) => describeReading(found),
     refresh: () => lens.refresh(),
   }
 }

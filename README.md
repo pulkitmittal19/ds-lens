@@ -1,5 +1,7 @@
 <div align="center">
 
+<img src="docs/logo.svg" alt="" width="84" height="84">
+
 # ds-lens
 
 **Hover any element and find out whether it is actually on your design system.**
@@ -77,6 +79,8 @@ __dsLens.readPoint(x, y)                 // pairs with an annotation's coords
 __dsLens.audit()                         // every off-system value, grouped
 __dsLens.audit({ root: 'table', properties: ['type'] })
 __dsLens.roles()                         // what it thinks your ladder is
+__dsLens.enrich(annotation)              // an annotation + what it measures
+__dsLens.describe(reading)               // that reading as one readable line
 ```
 
 Anything that can run a line of JavaScript in the page can use it — Playwright,
@@ -139,18 +143,29 @@ agent *where* someone pointed without saying what that element measures.
 **They don't fight.** While locked, ds-lens intercepts clicks — so it skips
 known floating toolbars by default, and `overlaySelectors` adds your own.
 
-**They cooperate through the page, not through each other:**
+**They cooperate through the page, not through each other.** Hand an
+annotation to `enrich` and get it back with the measurement attached:
 
 ```js
-// annotation: { comment: "this looks tight", elementPath: "#page > .row > #btn" }
-__dsLens.readSelector('#page > .row > #btn')
-// → 14px / 500 / 20px   text-label-md
-//   inherited from #btn · .text-label-md · layer utilities
+import { enrich, describe } from 'ds-lens'
+
+enrich(annotation)
+// { comment: "this looks tight",
+//   elementPath: "#page > .row > #btn",
+//   dsLens: { type: {...}, readings: [...], offSystem: [...] } }
+
+describe(enrich(annotation).dsLens)
+// "14px / 500 / 20px · text-label-md · layer utilities"
+// "13px / 450 / 13px · no role, nearest text-label-md · UNLAYERED"
 ```
 
-The contract is a CSS selector, so any annotation tool works. If agentation
-happens to be on the page, ds-lens borrows its accent colour; if not, it uses
-its own blue.
+`enrich` accepts `elementPath`, `selector`, `element` or `x`/`y`, so it works
+with agentation, Vercel Comments and anything else that reports where a click
+landed. ds-lens imports nothing from any of them. Both are on the global too —
+`__dsLens.enrich(...)`, `__dsLens.describe(...)`.
+
+If agentation happens to be on the page, ds-lens borrows its accent colour; if
+not, it uses its own blue.
 
 ## Limits
 
