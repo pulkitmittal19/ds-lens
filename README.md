@@ -33,8 +33,11 @@ No inspector reports which layer won. This one does.
 
 ## Install
 
+Not on npm yet. Install from the repository — the package builds itself on
+install, so there is nothing else to run:
+
 ```bash
-npm i -D ds-lens
+npm i -D github:pulkitmittal19/ds-lens
 ```
 
 ```tsx
