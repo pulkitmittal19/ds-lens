@@ -46,6 +46,18 @@ export class Lens {
   private properties: string[]
 
   constructor(private config: DsLensConfig = {}) {
+    /* A Lens reads the document as it is constructed, so it needs a real page.
+       Importing this module does not — that is the point of the split — but a
+       CI script that forgets to open one used to get
+       `ReferenceError: getComputedStyle is not defined` from three frames deep
+       in the token table, which says nothing about what to do. */
+    if (typeof document === 'undefined' || typeof getComputedStyle === 'undefined') {
+      throw new Error(
+        'ds-lens: new Lens() needs a browser document — it reads the page\'s custom ' +
+        'properties as it is constructed. Run it inside the page (Playwright/Puppeteer ' +
+        '`page.evaluate`, a devtools console, a bundled app), not in plain Node.',
+      )
+    }
     this.table = buildTokenTable(config.tokenPrefixes)
     const configured = configuredRoles(config)
     this.roles = configured.length ? configured : discoverRoles(config.rolePattern)

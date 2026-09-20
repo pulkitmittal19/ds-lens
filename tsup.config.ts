@@ -1,7 +1,7 @@
 import { defineConfig } from 'tsup'
 
 export default defineConfig({
-  entry: ['src/index.ts'],
+  entry: ['src/index.ts', 'src/react.ts'],
   /* Both formats. The overlay is React and most consumers are on a bundler
      that prefers ESM, but ds-lens is also meant to be reachable from a
      Playwright or Node script that only has require(). */

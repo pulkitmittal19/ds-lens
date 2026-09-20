@@ -10,7 +10,7 @@ Which token. Which type role. Which cascade layer won.
 
 <img src="docs/panel.svg" alt="ds-lens panels: one element on the design system, one off it" width="740">
 
-<sub>MIT · no runtime dependencies of its own · needs a browser</sub>
+<sub>MIT · no runtime dependencies of its own · React only for the overlay</sub>
 
 </div>
 
@@ -41,7 +41,7 @@ npm i -D github:pulkitmittal19/ds-lens
 ```
 
 ```tsx
-import { DsLens } from 'ds-lens'
+import { DsLens } from 'ds-lens/react'
 
 <>
   <App />
@@ -50,6 +50,11 @@ import { DsLens } from 'ds-lens'
 ```
 
 That's it. Zero configuration on a Tailwind v4 project.
+
+**Two entries.** `ds-lens` is the engine — no React anywhere in its import
+graph, so a Playwright script or a CI check can use it with React not
+installed at all. `ds-lens/react` is the overlay, and re-exports the engine, so
+a React app still writes one import.
 
 ## Three surfaces, one reader
 
@@ -128,12 +133,12 @@ if (offSystem > budget) process.exit(1)
 
 A full-page audit runs in about **17ms**.
 
-> **This has to run in a page, not in Node.** `new Lens()` reads the document's
-> custom properties as it is constructed, so it needs a real browser — drive it
-> through Playwright or Puppeteer and evaluate the two lines above in the page.
-> A plain `node script.js` throws `getComputedStyle is not defined`. Importing
-> the package also pulls in React today, because the overlay and the engine
-> share one entry; splitting them is the next change.
+> **Constructed in a page, not in Node.** Importing `ds-lens` in Node is fine
+> and needs no React — but `new Lens()` reads the document's custom properties
+> as it is built, so construct it inside the page: Playwright or Puppeteer's
+> `page.evaluate`, a devtools console, or your bundled app. Calling it in plain
+> Node throws with that instruction rather than a stray `getComputedStyle is
+> not defined`.
 
 ## Configuration
 
@@ -214,10 +219,9 @@ not, it uses its own blue.
 - `@scope` proximity and transitions are not modelled in the cascade sort.
 - Token matching is by resolved value. Two tokens sharing a value are genuinely
   ambiguous — narrow with `tokenPrefixes`.
-- The overlay is React, and the engine (`Lens`) is plain DOM — but they share
-  one entry point, so importing either pulls React in. The engine touches the
-  document only when constructed, not at module load, so an import is safe
-  during SSR; constructing a `Lens` is not.
+- The overlay is React and lives at `ds-lens/react`. The engine is plain DOM
+  and imports nothing, so it is safe to import during SSR or in Node —
+  constructing a `Lens` is what needs a document.
 
 ## Development
 
