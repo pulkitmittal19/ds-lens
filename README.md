@@ -69,19 +69,24 @@ A 44px button you can drag anywhere; its position is remembered.
 | **Locked** | click the button | copy the reading |
 
 A copied reading is four lines, not the raw object — the size it is actually
-read at. Hold <kbd>⇧</kbd> while clicking for the full JSON instead.
+read at. Hold <kbd>⌘</kbd> / <kbd>Ctrl</kbd> while clicking for the full JSON
+instead.
 
-**Measuring between two elements** — press <kbd>M</kbd> over one element to pin
-it, then move to another. The gap is drawn on the page and shown in the panel,
-edge to edge, per axis. Shared edges are called out too:
+**Measuring between two elements** — hold <kbd>⇧</kbd> while inspecting.
+Whatever was under the cursor becomes the reference, and moving to anything
+else draws the gap on the page and shows it in the panel:
 
 ```
 Gap     31px                      aligned left
 ```
 
-<kbd>M</kbd> again or <kbd>Esc</kbd> lets go. Per axis rather than one number,
-because two elements can sit 40px apart horizontally and overlap vertically —
-reporting a single figure there would be a guess about which was meant.
+Let go of <kbd>⇧</kbd> and you are back to inspecting. Nothing to pin, nothing
+to clear.
+
+Measured edge to edge, per axis rather than as one number — two elements can
+sit 40px apart horizontally and overlap vertically, and a single figure there
+would be a guess about which was meant. Shared edges are reported alongside,
+which answers the other half of the question.
 
 ```
 "Aisha Rahman"  ·  div.convo-row > div > div > span

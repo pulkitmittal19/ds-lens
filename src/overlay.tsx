@@ -417,7 +417,7 @@ export function DsLens(props: DsLensProps = {}) {
     const up = (e: KeyboardEvent) => { if (e.key === 'Alt') setPeek(false) }
     /* A held key is lost when the window loses focus, which leaves peek stuck
        on and every click swallowed until the page is reloaded. */
-    const blur = () => setPeek(false)
+    const blur = () => { setPeek(false); setPinned(null) }
     window.addEventListener('keydown', down)
     window.addEventListener('keyup', up)
     window.addEventListener('blur', blur)
@@ -440,14 +440,14 @@ export function DsLens(props: DsLensProps = {}) {
     }
     const key = (e: KeyboardEvent) => {
       if (e.key === 'Escape') { setPinned(null); setLocked(false); return }
-      /* M pins the element under the cursor as the thing to measure from —
-         the same gesture as holding a modifier over a second element in a
-         design tool. Pressing it again, or Escape, lets go. */
-      if (e.key === 'm' || e.key === 'M') {
-        e.preventDefault()
-        setPinned(current => (current ? null : hovered.current))
-      }
+      /* Hold Shift to measure. Whatever was under the cursor when Shift went
+         down becomes the thing to measure from, and moving to anything else
+         shows the gap — the gesture a design tool uses, with nothing to
+         remember and nothing to let go of afterwards.
+         keydown repeats while a key is held, so only the first one pins. */
+      if (e.key === 'Shift') setPinned(current => current ?? hovered.current)
     }
+    const keyUp = (e: KeyboardEvent) => { if (e.key === 'Shift') setPinned(null) }
     const click = (e: MouseEvent) => {
       if (!locked) return                       // peeking never steals a click
       if (skip(e.target as Element)) return
@@ -456,10 +456,10 @@ export function DsLens(props: DsLensProps = {}) {
       if (!el) return
       /* The short block by default: the full Inspection is ~50 lines of JSON
          for one element, which is the wrong thing to drop into a chat or a
-         comment. Shift gets the JSON, for when something is going to parse it
-         rather than read it. */
+         comment. Cmd or Ctrl gets the JSON, for when something is going to
+         parse it rather than read it — not Shift, which now means measure. */
       const found = lens.current!.read(el)
-      const text = e.shiftKey ? JSON.stringify(found, null, 2) : format(found)
+      const text = e.metaKey || e.ctrlKey ? JSON.stringify(found, null, 2) : format(found)
       navigator.clipboard?.writeText(text).then(
         () => { setCopied(true); setTimeout(() => setCopied(false), 1200) },
         () => {/* clipboard blocked — the panel still shows the values */},
@@ -468,10 +468,12 @@ export function DsLens(props: DsLensProps = {}) {
 
     document.addEventListener('mousemove', move, true)
     document.addEventListener('keydown', key, true)
+    document.addEventListener('keyup', keyUp, true)
     document.addEventListener('click', click, true)
     return () => {
       document.removeEventListener('mousemove', move, true)
       document.removeEventListener('keydown', key, true)
+      document.removeEventListener('keyup', keyUp, true)
       document.removeEventListener('click', click, true)
     }
   }, [on, locked, skip])
