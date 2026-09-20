@@ -319,8 +319,15 @@ function Row({ name, value, verdict, ok, accent, swatch }: {
   name: string; value: string; verdict: string; ok: boolean; accent: string; swatch?: string
 }) {
   return (
-    <div style={{ display: 'grid', gridTemplateColumns: '46px minmax(0,1fr) auto', gap: 10, alignItems: 'baseline', padding: '4px 0' }}>
-      <span style={{ color: INK.faint, fontSize: 11, fontFamily: INK.sans }}>{name}</span>
+    /* 72px fits the longest label — "Border colour" — on one line. At 46 it
+       wrapped onto two, which pushed the value and the verdict out of line
+       with every other row and made the panel look broken. A label that still
+       does not fit is clipped rather than reflowed: a row is one line. */
+    <div style={{ display: 'grid', gridTemplateColumns: '72px minmax(0,1fr) auto', gap: 10, alignItems: 'baseline', padding: '4px 0' }}>
+      <span style={{
+        color: INK.faint, fontSize: 11, fontFamily: INK.sans,
+        whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
+      }}>{name}</span>
       <span style={{
         color: INK.text, fontFamily: INK.mono, fontSize: 11.5,
         whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
@@ -342,9 +349,39 @@ const tail = (text: string, max = 46) =>
 function Panel({ data, at, accent }: {
   data: Inspection; at: { x: number; y: number }; accent: string
 }) {
-  const W = 322
-  const left = Math.min(at.x + 18, window.innerWidth - W - 12)
-  const top = Math.min(at.y + 18, window.innerHeight - 190)
+  const W = 348
+  /* Placement has one job beyond staying on screen: not sitting on top of the
+     thing it is describing. Below-right of the cursor is the default, but on a
+     table row that lands squarely over the row's own controls — you can see
+     the reading and not the element, and the buttons you were about to click
+     are behind a panel. So the panel is measured, then moved off the element's
+     box: above it if there is room, otherwise below it, and only then clamped
+     to the viewport. It is pointer-events:none throughout, so it never eats a
+     click; this is about being able to SEE what you are pointing at. */
+  const box = useRef<HTMLDivElement | null>(null)
+  const [size, setSize] = useState({ w: W, h: 190 })
+  useEffect(() => {
+    const el = box.current
+    if (!el) return
+    const r = el.getBoundingClientRect()
+    setSize(prev => (Math.abs(prev.h - r.height) > 1 ? { w: r.width, h: r.height } : prev))
+  })
+
+  const GAP = 14
+  const vw = window.innerWidth
+  const vh = window.innerHeight
+  const el = data.box
+  let left = at.x + 18
+  let top = at.y + 18
+  /* Would it land on the element? Go above, then below, then leave it. */
+  const overlaps = top < el.y + el.height + GAP && top + size.h > el.y - GAP
+  if (overlaps) {
+    const above = el.y - GAP - size.h
+    top = above >= 12 ? above : el.y + el.height + GAP
+  }
+  left = Math.max(12, Math.min(left, vw - size.w - 12))
+  top = Math.max(12, Math.min(top, vh - size.h - 12))
+
   const origin = data.type.origin
   const off = data.offSystem.length
   const typeOk = data.type.verdict.status === 'role'
@@ -359,15 +396,21 @@ function Panel({ data, at, accent }: {
     : data.type.suggestion ? `\u2192 ${data.type.suggestion.name}` : 'no role'
 
   return (
-    <div style={{
-      position: 'fixed', left, top: Math.max(12, top), width: W, zIndex: 2147483647,
+    <div ref={box} style={{
+      position: 'fixed', left, top, width: W, zIndex: 2147483647,
       background: INK.panel, borderRadius: 12, boxShadow: INK.shadow,
       padding: '11px 13px 11px', pointerEvents: 'none',
       font: `400 12px/1.45 ${INK.sans}`, color: INK.text,
     }}>
       <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 10 }}>
+        {/* The selector, always. This used to prefer the element's text, which
+            is fine for a leaf and useless for anything else: a table footer
+            came out as "Show10 entries1-12 of 248 contacts12345…", because
+            textContent runs every descendant together with no spaces. The
+            text is on the screen already — what you cannot see is which
+            element you are on. */}
         <span style={{ fontSize: 12.5, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-          {data.text || tail(data.selector, 30)}
+          {tail(data.selector, 34)}
         </span>
         {off > 0 && (
           <span style={{ color: INK.bad, fontSize: 11, whiteSpace: 'nowrap' }}>{off} off</span>

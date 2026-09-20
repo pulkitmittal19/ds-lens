@@ -18,12 +18,20 @@ const DEFAULT_PROPERTIES = [
 ]
 
 /** A short, stable selector for an element — readable, and good enough to re-find it. */
+/* `className` is a string on HTML and an SVGAnimatedString on SVG, so
+   `String(el.className)` turns every icon into `[object SVGAnimatedString]` —
+   which is what the panel showed for any element inside an icon. The class
+   ATTRIBUTE is a string on both. */
+export function classesOf(el: Element): string {
+  return el.getAttribute('class') || ''
+}
+
 export function selectorFor(el: Element): string {
   if (el.id) return `#${el.id}`
   const parts: string[] = []
   let node: Element | null = el
   while (node && node !== document.body && parts.length < 4) {
-    const classes = String((node as HTMLElement).className || '')
+    const classes = classesOf(node)
       .split(/\s+/).filter(Boolean).slice(0, 2)
     parts.unshift(node.tagName.toLowerCase() + classes.map(c => `.${c}`).join(''))
     if (node.id) { parts[0] = `#${node.id}`; break }
@@ -131,8 +139,10 @@ export class Lens {
     return {
       selector: selectorFor(el),
       tagName: el.tagName.toLowerCase(),
-      className: String((el as HTMLElement).className || ''),
-      text: (el.textContent || '').trim().slice(0, 60),
+      className: classesOf(el),
+      /* Collapsed, because textContent runs every descendant together: a table
+         footer came out as "Show10 entries1-12 of 248 contacts12345". */
+      text: (el.textContent || '').replace(/\s+/g, ' ').trim().slice(0, 60),
       box: { x: Math.round(box.x), y: Math.round(box.y), width: Math.round(box.width), height: Math.round(box.height) },
       type: {
         value: typeValue,
