@@ -184,11 +184,11 @@ function Chip({ locked, peeking, copied, accent, onToggle }: {
    on a fractional boundary. For a ruler that is the wrong trade. */
 function Rulers({ a, b, accent }: { a: DOMRect; b: DOMRect; accent: string }) {
   const d: Distance = distanceBetween(a, b)
-  const cap = (x: number, y: number, vertical: boolean) => ({
-    position: 'fixed' as const, left: vertical ? x - 4 : x - 0.5, top: vertical ? y - 0.5 : y - 4,
-    width: vertical ? 8 : 1, height: vertical ? 1 : 8, background: accent, zIndex: 2147483645,
-    pointerEvents: 'none' as const,
-  })
+  /* One pixel off each end. A ruler that lands exactly on an element's edge
+     sits on top of its border and reads as the line running into the frame
+     rather than stopping at it. End ticks did the same, worse — they extend
+     across the border — so there are none. */
+  const INSET = 1
   return (
     <>
       <div style={{
@@ -197,17 +197,16 @@ function Rulers({ a, b, accent }: { a: DOMRect; b: DOMRect; accent: string }) {
       }} />
       {d.gaps.map(g => {
         const horizontal = g.axis === 'x'
+        const length = Math.max(0, g.distance - INSET * 2)
         return (
           <div key={g.axis}>
             <div style={{
               position: 'fixed', zIndex: 2147483645, background: accent, pointerEvents: 'none',
-              left: horizontal ? g.from.x : g.from.x - 0.5,
-              top: horizontal ? g.from.y - 0.5 : g.from.y,
-              width: horizontal ? g.distance : 1,
-              height: horizontal ? 1 : g.distance,
+              left: horizontal ? g.from.x + INSET : g.from.x - 0.5,
+              top: horizontal ? g.from.y - 0.5 : g.from.y + INSET,
+              width: horizontal ? length : 1,
+              height: horizontal ? 1 : length,
             }} />
-            <div style={cap(g.from.x, g.from.y, horizontal)} />
-            <div style={cap(g.to.x, g.to.y, horizontal)} />
             <span style={{
               position: 'fixed', zIndex: 2147483646,
               left: horizontal ? (g.from.x + g.to.x) / 2 : g.from.x + 8,
@@ -229,29 +228,22 @@ function Rulers({ a, b, accent }: { a: DOMRect; b: DOMRect; accent: string }) {
    collapses to this: the distance, and whether the edges line up. Everything
    else comes back the moment Shift is released. */
 function Readout({ d, at, accent }: { d: Distance; at: { x: number; y: number }; accent: string }) {
-  /* Each gap already carries its own label on the ruler, so repeating a single
-     distance here is the same number twice. The readout earns its place only
-     when it can say something the rulers cannot: a two-axis summary, an
-     overlap that has no ruler at all, or which edges line up. */
+  /* Each gap carries its own label on the ruler, so this only appears when it
+     can say something the rulers cannot: a two-axis summary, or an overlap,
+     which has no ruler at all. One distance is never printed twice. */
   const summary = d.overlapping ? 'overlapping' : d.gaps.length > 1 ? formatDistance(d) : ''
-  if (!summary && d.aligned.length === 0) return null
+  if (!summary) return null
   return (
     <div style={{
       position: 'fixed', zIndex: 2147483647,
-      left: Math.min(at.x + 18, window.innerWidth - 200),
+      left: Math.min(at.x + 18, window.innerWidth - 160),
       top: Math.min(at.y + 18, window.innerHeight - 40),
       background: INK.panel, borderRadius: 8, padding: '5px 9px',
-      font: `500 12px/1.3 ${INK.sans}`, color: INK.text,
+      font: `500 12px/1.3 ${INK.sans}`, color: accent,
+      fontFamily: INK.mono, fontSize: 11.5,
       boxShadow: INK.shadow, pointerEvents: 'none', whiteSpace: 'nowrap',
     }}>
-      {summary && (
-        <span style={{ color: accent, fontFamily: INK.mono, fontSize: 11.5 }}>{summary}</span>
-      )}
-      {d.aligned.length > 0 && (
-        <span style={{ color: INK.dim, fontSize: 11 }}>
-          {summary ? '  ·  ' : ''}aligned {d.aligned.join(' ')}
-        </span>
-      )}
+      {summary}
     </div>
   )
 }

@@ -78,17 +78,16 @@ else draws the gap on the page and shows it in the panel:
 
 **The CSS panel gets out of the way** while you hold <kbd>⇧</kbd> — it is the
 one thing covering the gap you are looking at, and none of its rows answer the
-question being asked. What replaces it says only what the rulers cannot: a
-two-axis summary, an overlap, or which edges line up. A single distance is
-never printed twice.
+question being asked. Nothing replaces it unless there is something the rulers
+cannot say: a two-axis summary, or an overlap, which has no ruler at all. A
+single distance is never printed twice.
 
 Let go of <kbd>⇧</kbd> and everything comes back. Nothing to pin, nothing to
 clear.
 
 Measured edge to edge, per axis rather than as one number — two elements can
 sit 40px apart horizontally and overlap vertically, and a single figure there
-would be a guess about which was meant. Shared edges are reported alongside,
-which answers the other half of the question.
+would be a guess about which was meant.
 
 ```
 "Aisha Rahman"  ·  div.convo-row > div > div > span
