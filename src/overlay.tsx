@@ -217,6 +217,38 @@ function Rulers({ a, b, accent }: { a: DOMRect; b: DOMRect; accent: string }) {
   )
 }
 
+/* While measuring, the CSS panel is the thing in the way — it covers the very
+   gap being looked at, and none of its rows are the question being asked. It
+   collapses to this: the distance, and whether the edges line up. Everything
+   else comes back the moment Shift is released. */
+function Readout({ d, at, accent }: { d: Distance; at: { x: number; y: number }; accent: string }) {
+  /* Each gap already carries its own label on the ruler, so repeating a single
+     distance here is the same number twice. The readout earns its place only
+     when it can say something the rulers cannot: a two-axis summary, an
+     overlap that has no ruler at all, or which edges line up. */
+  const summary = d.overlapping ? 'overlapping' : d.gaps.length > 1 ? formatDistance(d) : ''
+  if (!summary && d.aligned.length === 0) return null
+  return (
+    <div style={{
+      position: 'fixed', zIndex: 2147483647,
+      left: Math.min(at.x + 18, window.innerWidth - 200),
+      top: Math.min(at.y + 18, window.innerHeight - 40),
+      background: INK.panel, borderRadius: 8, padding: '5px 9px',
+      font: `500 12px/1.3 ${INK.sans}`, color: INK.text,
+      boxShadow: INK.shadow, pointerEvents: 'none', whiteSpace: 'nowrap',
+    }}>
+      {summary && (
+        <span style={{ color: accent, fontFamily: INK.mono, fontSize: 11.5 }}>{summary}</span>
+      )}
+      {d.aligned.length > 0 && (
+        <span style={{ color: INK.dim, fontSize: 11 }}>
+          {summary ? '  ·  ' : ''}aligned {d.aligned.join(' ')}
+        </span>
+      )}
+    </div>
+  )
+}
+
 function Pill({ children, tone }: { children: ReactNode; tone?: 'bad' }) {
   return (
     <span style={{
@@ -287,8 +319,8 @@ function Row({ name, value, verdict, ok, accent, swatch }: {
 const tail = (text: string, max = 46) =>
   text.length <= max ? text : '…' + text.slice(-(max - 1))
 
-function Panel({ data, at, accent, distance }: {
-  data: Inspection; at: { x: number; y: number }; accent: string; distance?: Distance
+function Panel({ data, at, accent }: {
+  data: Inspection; at: { x: number; y: number }; accent: string
 }) {
   const W = 322
   const left = Math.min(at.x + 18, window.innerWidth - W - 12)
@@ -341,14 +373,6 @@ function Panel({ data, at, accent, distance }: {
           />
         )
       })}
-
-      {distance && (
-        <Row
-          name="Gap" accent={accent} ok
-          value={formatDistance(distance)}
-          verdict={distance.aligned.length ? `aligned ${distance.aligned.join(' ')}` : ''}
-        />
-      )}
 
       {origin && !origin.layer && (
         <div style={{ marginTop: 7 }}>
@@ -504,13 +528,14 @@ export function DsLens(props: DsLensProps = {}) {
             left: found.box.x, top: found.box.y, width: found.box.width, height: found.box.height,
             outline: `1px solid ${accent}`, background: 'rgba(0,135,255,.12)',
           }} />
-          {measuring && (
-            <Rulers a={measuring.a} b={measuring.b} accent={accent} />
+          {measuring ? (
+            <>
+              <Rulers a={measuring.a} b={measuring.b} accent={accent} />
+              <Readout d={distanceBetween(measuring.a, measuring.b)} at={at} accent={accent} />
+            </>
+          ) : (
+            <Panel data={found} at={at} accent={accent} />
           )}
-          <Panel
-            data={found} at={at} accent={accent}
-            distance={measuring ? distanceBetween(measuring.a, measuring.b) : undefined}
-          />
         </>
       )}
     </div>,

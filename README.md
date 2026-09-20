@@ -76,12 +76,14 @@ instead.
 Whatever was under the cursor becomes the reference, and moving to anything
 else draws the gap on the page and shows it in the panel:
 
-```
-Gap     31px                      aligned left
-```
+**The CSS panel gets out of the way** while you hold <kbd>⇧</kbd> — it is the
+one thing covering the gap you are looking at, and none of its rows answer the
+question being asked. What replaces it says only what the rulers cannot: a
+two-axis summary, an overlap, or which edges line up. A single distance is
+never printed twice.
 
-Let go of <kbd>⇧</kbd> and you are back to inspecting. Nothing to pin, nothing
-to clear.
+Let go of <kbd>⇧</kbd> and everything comes back. Nothing to pin, nothing to
+clear.
 
 Measured edge to edge, per axis rather than as one number — two elements can
 sit 40px apart horizontally and overlap vertically, and a single figure there
