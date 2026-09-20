@@ -17,11 +17,11 @@ import { format } from './annotate'
 import { distanceBetween, formatDistance, type Distance } from './measure'
 import { createGlobal } from './agent'
 import { VERSION } from './version'
-import type { DsLensConfig, Inspection, Reading } from './types'
+import type { StyleLensConfig, Inspection, Reading } from './types'
 
 /* Agentation's palette, measured from its own toolbar rather than guessed:
    surface #1A1A1A, raised #252525, dividers #484848, white text, and two
-   accents it ships — a blue and a red. ds-lens sits beside that toolbar, so
+   accents it ships — a blue and a red. stylelens sits beside that toolbar, so
    matching it is the difference between one tool and two.
 
    The accent is read from agentation at runtime when it is on the page, so
@@ -41,7 +41,7 @@ const INK = {
   shadow: '0 2px 8px rgba(0,0,0,.30), 0 8px 28px rgba(0,0,0,.24)',
 }
 
-/** Agentation's accent if it is mounted, else ds-lens's own blue. */
+/** Agentation's accent if it is mounted, else stylelens's own blue. */
 function readAccent(): string {
   const host = document.querySelector('[data-agentation-root]')
   const v = host && getComputedStyle(host).getPropertyValue('--agentation-color-accent').trim()
@@ -61,7 +61,7 @@ function Swatch({ value }: { value: string }) {
 
 /* Lucide `crosshair`, copied exactly rather than redrawn — an approximated
    icon is the kind of thing nobody notices and everybody feels. Inlined rather
-   than imported so ds-lens keeps zero runtime dependencies.
+   than imported so stylelens keeps zero runtime dependencies.
    lucide-react v0.562.0, ISC. */
 function Crosshair({ size = 18 }: { size?: number }) {
   return (
@@ -76,7 +76,7 @@ function Crosshair({ size = 18 }: { size?: number }) {
   )
 }
 
-const POS_KEY = 'ds-lens:pos'
+const POS_KEY = 'stylelens:pos'
 const CHIP = 44
 
 /* Bottom-left by default, because agentation and most other floating toolbars
@@ -144,7 +144,7 @@ function Chip({ locked, peeking, copied, accent, onToggle }: {
     <div
       onPointerDown={down} onPointerMove={move} onPointerUp={up} onPointerCancel={up}
       onPointerEnter={() => setHover(true)} onPointerLeave={() => setHover(false)}
-      role="button" tabIndex={0} aria-pressed={locked} aria-label="ds-lens inspector"
+      role="button" tabIndex={0} aria-pressed={locked} aria-label="stylelens inspector"
       onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onToggle() } }}
       style={{
         position: 'fixed', left: pos.x, top: pos.y, width: CHIP, height: CHIP,
@@ -262,16 +262,16 @@ function Pill({ children, tone }: { children: ReactNode; tone?: 'bad' }) {
 
 /* Other tools' floating UI.
  *
- * ds-lens swallows clicks while it is active, so anything it does not skip
+ * stylelens swallows clicks while it is active, so anything it does not skip
  * becomes unclickable. Measured against agentation: with the inspector on, a
  * click on its toolbar was preventDefault'd and never arrived. An inspector
  * that quietly disables the annotation tool beside it is worse than no
  * inspector, so known overlay roots are skipped by default and a host can add
  * its own with `overlaySelectors` or by marking an element
- * `data-ds-lens-ignore`. */
+ * `data-stylelens-ignore`. */
 const OVERLAY_ROOTS = [
-  '[data-ds-lens]',
-  '[data-ds-lens-ignore]',
+  '[data-stylelens]',
+  '[data-stylelens-ignore]',
   '[data-agentation-root]',
   '[data-stagewise-companion-anchor]',
   '#vercel-live-feedback',
@@ -356,10 +356,10 @@ function Row({ name, value, verdict, ok, accent, swatch }: {
  *
  * So: one enter animation on mount, and nothing after. The node persists
  * across element changes, so it plays once. */
-const STYLE_ID = 'ds-lens-keyframes'
+const STYLE_ID = 'stylelens-keyframes'
 const KEYFRAMES = `
-@keyframes ds-lens-panel-in { from { opacity: 0; transform: scale(.95) translateY(4px) } to { opacity: 1; transform: none } }
-@keyframes ds-lens-box-in { from { opacity: 0 } to { opacity: 1 } }
+@keyframes stylelens-panel-in { from { opacity: 0; transform: scale(.95) translateY(4px) } to { opacity: 1; transform: none } }
+@keyframes stylelens-box-in { from { opacity: 0 } to { opacity: 1 } }
 `
 function useKeyframes(): void {
   useEffect(() => {
@@ -438,7 +438,7 @@ function Panel({ data, at, accent }: {
       position: 'fixed', left, top, width: W, zIndex: 2147483647,
       /* No transition. See the note by KEYFRAMES: a readout that follows a
          pointer must never be in transit. It fades in once and snaps after. */
-      animation: 'ds-lens-panel-in .1s ease-out',
+      animation: 'stylelens-panel-in .1s ease-out',
       willChange: 'opacity', contain: 'layout style',
       background: INK.panel, borderRadius: 12, boxShadow: INK.shadow,
       padding: '11px 13px 11px', pointerEvents: 'none',
@@ -488,7 +488,7 @@ function Panel({ data, at, accent }: {
   )
 }
 
-export interface DsLensProps extends DsLensConfig {
+export interface StyleLensProps extends StyleLensConfig {
   /** Start with the inspector already on. Default false. */
   defaultOn?: boolean
   /** Extra floating UI to leave alone, added to the built-in list. */
@@ -497,9 +497,9 @@ export interface DsLensProps extends DsLensConfig {
   accent?: string
 }
 
-export function DsLens(props: DsLensProps = {}) {
+export function StyleLens(props: StyleLensProps = {}) {
   const {
-    defaultOn = false, exposeGlobal = true, globalName = '__dsLens',
+    defaultOn = false, exposeGlobal = true, globalName = '__styleLens',
     overlaySelectors = [], accent: _accent, ...config
   } = props
   /* Injected from the root, not from Panel: a keyframe that arrives with the
@@ -551,7 +551,7 @@ export function DsLens(props: DsLensProps = {}) {
     [overlaySelectors.join('|')],
   )
 
-  /* True for ds-lens's own UI and for any other tool's floating UI. Those
+  /* True for stylelens's own UI and for any other tool's floating UI. Those
      elements are never inspected and never have their clicks intercepted. */
   const skip = useCallback((el: Element | null) => {
     if (!el) return true
@@ -683,7 +683,7 @@ export function DsLens(props: DsLensProps = {}) {
     : null
 
   return createPortal(
-    <div data-ds-lens="">
+    <div data-stylelens="">
       <Chip
         locked={locked}
         peeking={peek}
@@ -698,7 +698,7 @@ export function DsLens(props: DsLensProps = {}) {
             position: 'fixed', pointerEvents: 'none', zIndex: 2147483646,
             left: found.box.x, top: found.box.y, width: found.box.width, height: found.box.height,
             outline: `1px solid ${accent}`, background: 'rgba(0,135,255,.12)',
-            animation: 'ds-lens-box-in .12s ease-out',
+            animation: 'stylelens-box-in .12s ease-out',
             willChange: 'opacity', contain: 'layout style',
           }} />
           {measuring ? (

@@ -2,13 +2,13 @@
 
 <img src="docs/logo.svg" alt="" width="84" height="84">
 
-# ds-lens
+# stylelens
 
 **Hover any element and find out whether it is actually on your design system.**
 
 Which token. Which type role. Which cascade layer won.
 
-<img src="docs/panel.svg" alt="ds-lens panels: one element on the design system, one off it" width="740">
+<img src="docs/panel.svg" alt="stylelens panels: one element on the design system, one off it" width="740">
 
 <sub>MIT · no runtime dependencies of its own · React only for the overlay</sub>
 
@@ -37,23 +37,23 @@ Not on npm yet. Install from the repository — the package builds itself on
 install, so there is nothing else to run:
 
 ```bash
-npm i -D github:pulkitmittal19/ds-lens
+npm i -D github:pulkitmittal19/stylelens
 ```
 
 ```tsx
-import { DsLens } from 'ds-lens/react'
+import { StyleLens } from 'stylelens/react'
 
 <>
   <App />
-  {import.meta.env.DEV && <DsLens />}
+  {import.meta.env.DEV && <StyleLens />}
 </>
 ```
 
 That's it. Zero configuration on a Tailwind v4 project.
 
-**Two entries.** `ds-lens` is the engine — no React anywhere in its import
+**Two entries.** `stylelens` is the engine — no React anywhere in its import
 graph, so a Playwright script or a CI check can use it with React not
-installed at all. `ds-lens/react` is the overlay, and re-exports the engine, so
+installed at all. `stylelens/react` is the overlay, and re-exports the engine, so
 a React app still writes one import.
 
 ## Three surfaces, one reader
@@ -61,7 +61,7 @@ a React app still writes one import.
 |  | For | How |
 |---|---|---|
 | **Overlay** | people | a draggable crosshair button |
-| **`window.__dsLens`** | agents | plain JSON, no protocol |
+| **`window.__styleLens`** | agents | plain JSON, no protocol |
 | **`new Lens()`** | CI | fail a build when the count goes up |
 
 All three call the same function, so the panel a designer reads and the numbers
@@ -110,13 +110,13 @@ go, click it. <kbd>Esc</kbd> unlocks.
 ### Agent API
 
 ```js
-__dsLens.readSelector('.contact-name')   // one element
-__dsLens.readPoint(x, y)                 // pairs with an annotation's coords
-__dsLens.audit()                         // every off-system value, grouped
-__dsLens.audit({ root: 'table', properties: ['type'] })
-__dsLens.roles()                         // what it thinks your ladder is
-__dsLens.enrich(annotation)              // an annotation + what it measures
-__dsLens.describe(reading)               // that reading as one readable line
+__styleLens.readSelector('.contact-name')   // one element
+__styleLens.readPoint(x, y)                 // pairs with an annotation's coords
+__styleLens.audit()                         // every off-system value, grouped
+__styleLens.audit({ root: 'table', properties: ['type'] })
+__styleLens.roles()                         // what it thinks your ladder is
+__styleLens.enrich(annotation)              // an annotation + what it measures
+__styleLens.describe(reading)               // that reading as one readable line
 ```
 
 `format(reading)` gives the four-line block instead of a single line.
@@ -133,7 +133,7 @@ if (offSystem > budget) process.exit(1)
 
 A full-page audit runs in about **17ms**.
 
-> **Constructed in a page, not in Node.** Importing `ds-lens` in Node is fine
+> **Constructed in a page, not in Node.** Importing `stylelens` in Node is fine
 > and needs no React — but `new Lens()` reads the document's custom properties
 > as it is built, so construct it inside the page: Playwright or Puppeteer's
 > `page.evaluate`, a devtools console, or your bundled app. Calling it in plain
@@ -145,7 +145,7 @@ A full-page audit runs in about **17ms**.
 Everything is optional.
 
 ```tsx
-<DsLens
+<StyleLens
   rolePattern={/^type-/}              // default /^text-[a-z][\w-]*$/
   tokenPrefixes={['--ds-']}           // default: every :root custom property
   properties={['color', 'gap']}       // default: type, colour, spacing, shape
@@ -181,35 +181,35 @@ important declarations, which is the part people misremember.
 
 ## Alongside an annotation tool
 
-ds-lens needs nothing else installed. But it plays well with
+stylelens needs nothing else installed. But it plays well with
 [agentation](https://agentation.com), Vercel Comments and friends, which tell an
 agent *where* someone pointed without saying what that element measures.
 
-**They don't fight.** While locked, ds-lens intercepts clicks — so it skips
+**They don't fight.** While locked, stylelens intercepts clicks — so it skips
 known floating toolbars by default, and `overlaySelectors` adds your own.
 
 **They cooperate through the page, not through each other.** Hand an
 annotation to `enrich` and get it back with the measurement attached:
 
 ```js
-import { enrich, describe } from 'ds-lens'
+import { enrich, describe } from 'stylelens'
 
 enrich(annotation)
 // { comment: "this looks tight",
 //   elementPath: "#page > .row > #btn",
-//   dsLens: { type: {...}, readings: [...], offSystem: [...] } }
+//   styleLens: { type: {...}, readings: [...], offSystem: [...] } }
 
-describe(enrich(annotation).dsLens)
+describe(enrich(annotation).styleLens)
 // "14px / 500 / 20px · text-label-md · layer utilities"
 // "13px / 450 / 13px · no role, nearest text-label-md · UNLAYERED"
 ```
 
 `enrich` accepts `elementPath`, `selector`, `element` or `x`/`y`, so it works
 with agentation, Vercel Comments and anything else that reports where a click
-landed. ds-lens imports nothing from any of them. Both are on the global too —
-`__dsLens.enrich(...)`, `__dsLens.describe(...)`.
+landed. stylelens imports nothing from any of them. Both are on the global too —
+`__styleLens.enrich(...)`, `__styleLens.describe(...)`.
 
-If agentation happens to be on the page, ds-lens borrows its accent colour; if
+If agentation happens to be on the page, stylelens borrows its accent colour; if
 not, it uses its own blue.
 
 ## Limits
@@ -219,7 +219,7 @@ not, it uses its own blue.
 - `@scope` proximity and transitions are not modelled in the cascade sort.
 - Token matching is by resolved value. Two tokens sharing a value are genuinely
   ambiguous — narrow with `tokenPrefixes`.
-- The overlay is React and lives at `ds-lens/react`. The engine is plain DOM
+- The overlay is React and lives at `stylelens/react`. The engine is plain DOM
   and imports nothing, so it is safe to import during SSR or in Node —
   constructing a `Lens` is what needs a document.
 
@@ -238,8 +238,8 @@ alias than a `file:` dependency — you get hot reload and skip the rebuild:
 
 ```ts
 // vite.config.ts
-resolve: { alias: { 'ds-lens': '/abs/path/to/ds-lens/src/index.ts' } },
-server:  { fs: { allow: ['.', '/abs/path/to/ds-lens'] } },
+resolve: { alias: { 'stylelens': '/abs/path/to/stylelens/src/index.ts' } },
+server:  { fs: { allow: ['.', '/abs/path/to/stylelens'] } },
 ```
 
 That second line matters. Vite refuses to serve files outside its root, and

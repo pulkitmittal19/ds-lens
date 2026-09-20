@@ -1,5 +1,5 @@
 {
-  "name": "ds-lens",
+  "name": "stylelens",
   "version": "0.2.0",
   "description": "Hover any element and see whether it is actually on your design system — which token, which type role, and which cascade layer won.",
   "keywords": [
@@ -15,11 +15,11 @@
   "author": "Pulkit Mittal (https://github.com/pulkitmittal19)",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/pulkitmittal19/ds-lens.git"
+    "url": "git+https://github.com/pulkitmittal19/stylelens.git"
   },
-  "homepage": "https://github.com/pulkitmittal19/ds-lens#readme",
+  "homepage": "https://github.com/pulkitmittal19/stylelens#readme",
   "bugs": {
-    "url": "https://github.com/pulkitmittal19/ds-lens/issues"
+    "url": "https://github.com/pulkitmittal19/stylelens/issues"
   },
   "type": "module",
   "sideEffects": false,
