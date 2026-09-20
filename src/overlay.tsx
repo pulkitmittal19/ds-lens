@@ -9,7 +9,7 @@
  * One dark panel in both themes, for the same reason DevTools uses one: it has
  * to stay legible above whatever it is floating over.
  */
-import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode, type PointerEvent as ReactPointerEvent } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode, type PointerEvent as ReactPointerEvent } from 'react'
 import { createPortal } from 'react-dom'
 import { Lens } from './inspect'
 import { toHex } from './color'
@@ -359,28 +359,38 @@ function Panel({ data, at, accent }: {
      to the viewport. It is pointer-events:none throughout, so it never eats a
      click; this is about being able to SEE what you are pointing at. */
   const box = useRef<HTMLDivElement | null>(null)
-  const [size, setSize] = useState({ w: W, h: 190 })
-  useEffect(() => {
-    const el = box.current
-    if (!el) return
-    const r = el.getBoundingClientRect()
-    setSize(prev => (Math.abs(prev.h - r.height) > 1 ? { w: r.width, h: r.height } : prev))
+  const [h, setH] = useState(190)
+  /* LAYOUT effect, not a passive one. Measuring after paint meant every move to
+     a new element drew the panel once at the previous element's height — in the
+     old place, for one frame — and then moved it. That one-frame correction,
+     sixty times a second, is what read as jitter. useLayoutEffect measures and
+     repositions before the browser paints, so there is only ever one position
+     per frame. */
+  useLayoutEffect(() => {
+    const node = box.current
+    if (!node) return
+    const measured = node.getBoundingClientRect().height
+    if (Math.abs(measured - h) > 1) setH(measured)
   })
 
-  const GAP = 14
+  /* ANCHORED TO THE ELEMENT, NOT THE CURSOR. Following the pointer meant the
+     panel slid continuously the whole time you were reading it, and changed
+     height mid-slide whenever you crossed a boundary — two motions at once,
+     neither of them useful. Anchored, it is perfectly still while you are on
+     one element and moves once when you move to the next, which is the only
+     moment anything has actually changed. */
+  const GAP = 12
   const vw = window.innerWidth
   const vh = window.innerHeight
   const el = data.box
-  let left = at.x + 18
-  let top = at.y + 18
-  /* Would it land on the element? Go above, then below, then leave it. */
-  const overlaps = top < el.y + el.height + GAP && top + size.h > el.y - GAP
-  if (overlaps) {
-    const above = el.y - GAP - size.h
-    top = above >= 12 ? above : el.y + el.height + GAP
-  }
-  left = Math.max(12, Math.min(left, vw - size.w - 12))
-  top = Math.max(12, Math.min(top, vh - size.h - 12))
+  const roomBelow = vh - (el.y + el.height) - GAP - 12
+  const roomAbove = el.y - GAP - 12
+  const below = roomBelow >= h || roomBelow >= roomAbove
+  const left = Math.max(12, Math.min(el.x, vw - W - 12))
+  const top = Math.max(12, Math.min(
+    below ? el.y + el.height + GAP : el.y - GAP - h,
+    vh - h - 12,
+  ))
 
   const origin = data.type.origin
   const off = data.offSystem.length
@@ -398,6 +408,10 @@ function Panel({ data, at, accent }: {
   return (
     <div ref={box} style={{
       position: 'fixed', left, top, width: W, zIndex: 2147483647,
+      /* Short, and on position only. The move between two elements is a real
+         change worth seeing; animating the height as well would mean the rows
+         inside sliding against a box that is still resizing. */
+      transition: 'top .13s cubic-bezier(.2,.8,.2,1), left .13s cubic-bezier(.2,.8,.2,1)',
       background: INK.panel, borderRadius: 12, boxShadow: INK.shadow,
       padding: '11px 13px 11px', pointerEvents: 'none',
       font: `400 12px/1.45 ${INK.sans}`, color: INK.text,
