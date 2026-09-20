@@ -489,11 +489,33 @@ export function DsLens(props: DsLensProps = {}) {
   }, [])
 
   useEffect(() => {
-    if (!on) { setFound(null); setPinned(null); return }
+    if (!on) { setFound(null); setPinned(null); hovered.current = null; return }
+    /* Cleared on every (re)attach as well: the skip above is keyed on the last
+       element read, so a stale ref would keep the panel empty until the cursor
+       crossed into something new. */
+    hovered.current = null
 
-    const move = (e: MouseEvent) => {
+    /* Mouse moves arrive faster than a frame — well over a hundred a second on
+       a trackpad — and a read is the expensive thing here: a computed style, a
+       box, and the winning rule for every property, which costs about 9ms on a
+       page this size. Doing that per event is three or four reads inside one
+       frame, all but the last of them thrown away. That was the jitter.
+
+       So: remember the last event, do the work once per frame, and skip the
+       read entirely while the cursor is still inside the same element — which
+       is most of the time, because elements are bigger than pixels. Only the
+       panel's position follows every frame, and that is a number. */
+    let latest: MouseEvent | null = null
+    let frame = 0
+
+    const read = () => {
+      frame = 0
+      const e = latest
+      if (!e) return
       const el = document.elementFromPoint(e.clientX, e.clientY)
       if (skip(el)) return
+      setAt({ x: e.clientX, y: e.clientY })
+      if (el === hovered.current) return          // same element: nothing to re-read
       /* The tooltip belongs to the nearest ANCESTOR carrying a title, not to
          whatever leaf the cursor happens to land on — a button's title fires
          while the cursor is over the icon inside it. */
@@ -509,8 +531,12 @@ export function DsLens(props: DsLensProps = {}) {
         titled.removeAttribute('title')
       }
       hovered.current = el!
-      setAt({ x: e.clientX, y: e.clientY })
       setFound(lens.current!.read(el!))
+    }
+
+    const move = (e: MouseEvent) => {
+      latest = e
+      if (!frame) frame = requestAnimationFrame(read)
     }
     const key = (e: KeyboardEvent) => {
       if (e.key === 'Escape') { setPinned(null); setLocked(false); return }
@@ -545,6 +571,7 @@ export function DsLens(props: DsLensProps = {}) {
     document.addEventListener('keyup', keyUp, true)
     document.addEventListener('click', click, true)
     return () => {
+      if (frame) cancelAnimationFrame(frame)
       /* Whatever was held aside goes back, even if the inspector is torn down
          mid-hover — a page must not be left missing a tooltip. */
       if (muted.current) {

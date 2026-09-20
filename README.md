@@ -10,7 +10,7 @@ Which token. Which type role. Which cascade layer won.
 
 <img src="docs/panel.svg" alt="ds-lens panels: one element on the design system, one off it" width="740">
 
-<sub>MIT · zero runtime dependencies · React optional</sub>
+<sub>MIT · no runtime dependencies of its own · needs a browser</sub>
 
 </div>
 
@@ -128,6 +128,13 @@ if (offSystem > budget) process.exit(1)
 
 A full-page audit runs in about **17ms**.
 
+> **This has to run in a page, not in Node.** `new Lens()` reads the document's
+> custom properties as it is constructed, so it needs a real browser — drive it
+> through Playwright or Puppeteer and evaluate the two lines above in the page.
+> A plain `node script.js` throws `getComputedStyle is not defined`. Importing
+> the package also pulls in React today, because the overlay and the engine
+> share one entry; splitting them is the next change.
+
 ## Configuration
 
 Everything is optional.
@@ -207,8 +214,10 @@ not, it uses its own blue.
 - `@scope` proximity and transitions are not modelled in the cascade sort.
 - Token matching is by resolved value. Two tokens sharing a value are genuinely
   ambiguous — narrow with `tokenPrefixes`.
-- The overlay is React. The engine (`Lens`) is plain DOM with no React import
-  and no module-level `document` access, so it runs under Node and during SSR.
+- The overlay is React, and the engine (`Lens`) is plain DOM — but they share
+  one entry point, so importing either pulls React in. The engine touches the
+  document only when constructed, not at module load, so an import is safe
+  during SSR; constructing a `Lens` is not.
 
 ## Development
 

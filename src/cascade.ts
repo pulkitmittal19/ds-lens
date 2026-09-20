@@ -55,13 +55,31 @@ function layerOrder(): Map<string, number> {
 
 let cachedLayers: Map<string, number> | null = null
 /** Call after a stylesheet is added or a layer is declared. */
-export function invalidateLayerOrder(): void { cachedLayers = null }
+export function invalidateLayerOrder(): void { cachedLayers = null; index = null }
 
-/** The declaration that won `property` on `el`, or null when nothing set it. */
-export function winningRule(el: Element, property: string): Origin | null {
+/* ── The rule index ───────────────────────────────────────────────────────────
+   Before this, `winningRule` walked every rule in every stylesheet on every
+   call — and it is called once per property, then again per ancestor for the
+   inherited ones. On a page with 53 stylesheets that made a single hover read
+   cost 40ms against a 16.7ms frame, which is what made the overlay jitter.
+
+   Almost all of that walk is the same answer every time: which rules set which
+   property, with what specificity, in which layer. Only `el.matches` depends on
+   the element. So the walk happens once and is kept, keyed by property, and a
+   read becomes a match against the handful of rules that set the property it
+   asks about.
+
+   Held until something changes the stylesheets — `invalidateLayerOrder()`,
+   which `Lens.refresh()` already calls, and a cheap sheet-count check for the
+   dev-server case where HMR adds one.                                        */
+type Indexed = Omit<Candidate, 'layerRank'> & { layerRank: number }
+let index: Map<string, Indexed[]> | null = null
+let indexedSheets = -1
+
+function buildIndex(): Map<string, Indexed[]> {
   const layers = (cachedLayers ??= layerOrder())
   const unlayered = layers.size + 1
-  const found: Candidate[] = []
+  const byProperty = new Map<string, Indexed[]>()
   let order = 0
 
   const walk = (rules: CSSRuleList, layer: string | null, source: string) => {
@@ -78,22 +96,46 @@ export function winningRule(el: Element, property: string): Origin | null {
         continue
       }
       order++
-      if (!style.getPropertyValue(property)) continue
-      let matches = false
-      try { matches = el.matches(selector) } catch { /* :has() etc. in old engines */ }
-      if (!matches) continue
-      found.push({
-        selector, layer, source, order,
-        important: style.getPropertyPriority(property) === 'important',
-        specificity: specificity(selector),
-        layerRank: layer === null ? unlayered : layers.get(layer) ?? 0,
-      })
+      const spec = specificity(selector)
+      const layerRank = layer === null ? unlayered : layers.get(layer) ?? 0
+      /* `style` is index-addressable and only lists the properties the rule
+         actually declares, which is the whole saving: no getPropertyValue
+         probe per property per rule. */
+      for (let i = 0; i < style.length; i++) {
+        const property = style[i]
+        let bucket = byProperty.get(property)
+        if (!bucket) byProperty.set(property, bucket = [])
+        bucket.push({
+          selector, layer, source, order,
+          important: style.getPropertyPriority(property) === 'important',
+          specificity: spec, layerRank,
+        })
+      }
     }
   }
 
   for (const sheet of Array.from(document.styleSheets)) {
     const source = sheet.href ? sheet.href.split('/').pop()! : 'inline'
     try { walk(sheet.cssRules, null, source) } catch { /* cross-origin */ }
+  }
+  indexedSheets = document.styleSheets.length
+  return byProperty
+}
+
+/** The declaration that won `property` on `el`, or null when nothing set it. */
+export function winningRule(el: Element, property: string): Origin | null {
+  if (index && indexedSheets !== document.styleSheets.length) index = null
+  const rules = (index ??= buildIndex()).get(property)
+  const layers = (cachedLayers ??= layerOrder())
+  const unlayered = layers.size + 1
+  const found: Candidate[] = []
+
+  if (rules) {
+    for (const candidate of rules) {
+      let matches = false
+      try { matches = el.matches(candidate.selector) } catch { /* :has() etc. in old engines */ }
+      if (matches) found.push(candidate)
+    }
   }
 
   /* The element's own style attribute outranks every stylesheet rule that is
