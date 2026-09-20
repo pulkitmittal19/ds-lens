@@ -13,6 +13,7 @@ import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode, type
 import { createPortal } from 'react-dom'
 import { Lens } from './inspect'
 import { toHex } from './color'
+import { format } from './annotate'
 import { createGlobal } from './agent'
 import type { DsLensConfig, Inspection, Reading } from './types'
 
@@ -385,7 +386,13 @@ export function DsLens(props: DsLensProps = {}) {
       e.preventDefault(); e.stopPropagation()
       const el = document.elementFromPoint(e.clientX, e.clientY)
       if (!el) return
-      navigator.clipboard?.writeText(JSON.stringify(lens.current!.read(el), null, 2)).then(
+      /* The short block by default: the full Inspection is ~50 lines of JSON
+         for one element, which is the wrong thing to drop into a chat or a
+         comment. Shift gets the JSON, for when something is going to parse it
+         rather than read it. */
+      const found = lens.current!.read(el)
+      const text = e.shiftKey ? JSON.stringify(found, null, 2) : format(found)
+      navigator.clipboard?.writeText(text).then(
         () => { setCopied(true); setTimeout(() => setCopied(false), 1200) },
         () => {/* clipboard blocked — the panel still shows the values */},
       )

@@ -11,6 +11,7 @@
  * from any of them and never will.
  */
 import { Lens } from './inspect'
+import { toHex, isColourProperty } from './color'
 import type { Inspection } from './types'
 
 /** The fields annotation tools use for "which element". All optional. */
@@ -111,4 +112,67 @@ export function describe(found: Inspection | null): string {
   if (raw.length) parts.push(`${raw.length} raw ${raw.length === 1 ? 'value' : 'values'}`)
 
   return parts.join(' · ')
+}
+
+/**
+ * A reading as a short block, for pasting into a chat message or a comment.
+ *
+ * The full Inspection is ~50 lines of JSON for one element — correct, and far
+ * too much to put in front of a person. This is the same information at the
+ * size it is actually read at: what the element is, what each value is, whether
+ * it is on the system, and where it came from.
+ *
+ *   "Aisha Rahman"  ·  div.convo-row > div > div > span
+ *   Type    14px / 600 / normal      ✗ nearest text-paragraph-md
+ *   Colour  #101828                  ✓ --foreground
+ *   Origin  inline style · UNLAYERED
+ */
+export function format(found: Inspection | null): string {
+  if (!found) return 'ds-lens: element not found'
+
+  const label = (p: string) =>
+    p === 'type' ? 'Type'
+    : p.startsWith('padding') ? 'Padding'
+    : p === 'background-color' ? 'Background'
+    : p === 'border-radius' ? 'Radius'
+    : p === 'color' ? 'Colour'
+    : p.replace(/(^|-)([a-z])/g, (_, d, c) => (d ? ' ' : '') + c.toUpperCase())
+
+  const row = (name: string, value: string, verdict: string) =>
+    `${name.padEnd(8)}${value.padEnd(26)}${verdict}`
+
+  const lines: string[] = []
+  const head = found.text ? `"${found.text}"  ·  ${found.selector}` : found.selector
+  lines.push(head)
+
+  lines.push(row(
+    'Type', found.type.value,
+    found.type.verdict.status === 'role'
+      ? `✓ ${found.type.verdict.name}`
+      : found.type.suggestion ? `✗ nearest ${found.type.suggestion.name}` : '✗ no role',
+  ))
+
+  for (const r of found.readings) {
+    const value = isColourProperty(r.property) ? toHex(r.value) : r.value
+    lines.push(row(
+      label(r.property), value,
+      r.verdict.status === 'token' ? `✓ ${r.verdict.name}` : '✗ raw',
+    ))
+  }
+
+  const o = found.type.origin
+  if (o) {
+    /* The selector is `style=""` for an inline style, which is accurate and
+       reads as noise. Name the thing instead. */
+    const where = o.selector === 'style=""' ? 'inline style' : o.selector
+    const bits = [o.inheritedFrom ? `inherited from ${o.inheritedFrom}` : null, where,
+                  o.layer ? `layer ${o.layer}` : 'UNLAYERED',
+                  o.important ? '!important' : null].filter(Boolean)
+    /* Not a value/verdict pair, so it does not get their columns — padding it
+       into them pushes the layer name to the far right, away from the thing it
+       qualifies. */
+    lines.push(`${'Origin'.padEnd(8)}${bits.join(' · ')}`)
+  }
+
+  return lines.join('\n').replace(/ +$/gm, '')
 }

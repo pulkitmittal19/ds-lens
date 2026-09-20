@@ -66,7 +66,17 @@ A 44px button you can drag anywhere; its position is remembered.
 | Mode | How | Clicks |
 |---|---|---|
 | **Peek** | hold <kbd>⌥</kbd> / <kbd>Alt</kbd> | pass straight through |
-| **Locked** | click the button | copy the reading as JSON |
+| **Locked** | click the button | copy the reading |
+
+A copied reading is four lines, not the raw object — the size it is actually
+read at. Hold <kbd>⇧</kbd> while clicking for the full JSON instead.
+
+```
+"Aisha Rahman"  ·  div.convo-row > div > div > span
+Type    14px / 600 / normal       ✗ nearest text-paragraph-md
+Colour  #101828                   ✓ --foreground
+Origin  inline style · UNLAYERED
+```
 
 Peek is the one to use alongside an annotation tool — look at an element, let
 go, click it. <kbd>Esc</kbd> unlocks.
@@ -82,6 +92,8 @@ __dsLens.roles()                         // what it thinks your ladder is
 __dsLens.enrich(annotation)              // an annotation + what it measures
 __dsLens.describe(reading)               // that reading as one readable line
 ```
+
+`format(reading)` gives the four-line block instead of a single line.
 
 Anything that can run a line of JavaScript in the page can use it — Playwright,
 Puppeteer, a devtools console, an MCP browser tool, a bookmarklet.
