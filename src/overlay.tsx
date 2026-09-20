@@ -343,6 +343,33 @@ function Row({ name, value, verdict, ok, accent, swatch }: {
 
 /* The tail of a selector is the part that identifies the element; the head is
    page furniture. Ellipsising the front keeps the useful half. */
+/* Appearance is animated; movement never is.
+ *
+ * Taken from agentation, whose hover interaction is the one to beat on this
+ * page. Its highlight and tooltip both fade in over ~0.1s and then SNAP to
+ * every new position — `transition-duration` on them computes to 0s. That is
+ * the whole trick: a readout that follows a pointer must never be in transit,
+ * because a new hover retargets it mid-flight and what you see is a box
+ * drifting toward somewhere it has already stopped caring about. An eased
+ * 130ms move, which is what this had, is exactly that.
+ *
+ * So: one enter animation on mount, and nothing after. The node persists
+ * across element changes, so it plays once. */
+const STYLE_ID = 'ds-lens-keyframes'
+const KEYFRAMES = `
+@keyframes ds-lens-panel-in { from { opacity: 0; transform: scale(.95) translateY(4px) } to { opacity: 1; transform: none } }
+@keyframes ds-lens-box-in { from { opacity: 0 } to { opacity: 1 } }
+`
+function useKeyframes(): void {
+  useEffect(() => {
+    if (document.getElementById(STYLE_ID)) return
+    const tag = document.createElement('style')
+    tag.id = STYLE_ID
+    tag.textContent = KEYFRAMES
+    document.head.append(tag)
+  }, [])
+}
+
 const tail = (text: string, max = 46) =>
   text.length <= max ? text : '…' + text.slice(-(max - 1))
 
@@ -408,10 +435,10 @@ function Panel({ data, at, accent }: {
   return (
     <div ref={box} style={{
       position: 'fixed', left, top, width: W, zIndex: 2147483647,
-      /* Short, and on position only. The move between two elements is a real
-         change worth seeing; animating the height as well would mean the rows
-         inside sliding against a box that is still resizing. */
-      transition: 'top .13s cubic-bezier(.2,.8,.2,1), left .13s cubic-bezier(.2,.8,.2,1)',
+      /* No transition. See the note by KEYFRAMES: a readout that follows a
+         pointer must never be in transit. It fades in once and snaps after. */
+      animation: 'ds-lens-panel-in .1s ease-out',
+      willChange: 'opacity', contain: 'layout style',
       background: INK.panel, borderRadius: 12, boxShadow: INK.shadow,
       padding: '11px 13px 11px', pointerEvents: 'none',
       font: `400 12px/1.45 ${INK.sans}`, color: INK.text,
@@ -474,6 +501,9 @@ export function DsLens(props: DsLensProps = {}) {
     defaultOn = false, exposeGlobal = true, globalName = '__dsLens',
     overlaySelectors = [], accent: _accent, ...config
   } = props
+  /* Injected from the root, not from Panel: a keyframe that arrives with the
+     element it animates is a keyframe that misses the first frame. */
+  useKeyframes()
   const [locked, setLocked] = useState(defaultOn)
   /* Hold Alt to peek. Peeking reads but never intercepts a click, so an
      annotation tool underneath stays usable — look at an element, let go, click
@@ -667,6 +697,8 @@ export function DsLens(props: DsLensProps = {}) {
             position: 'fixed', pointerEvents: 'none', zIndex: 2147483646,
             left: found.box.x, top: found.box.y, width: found.box.width, height: found.box.height,
             outline: `1px solid ${accent}`, background: 'rgba(0,135,255,.12)',
+            animation: 'ds-lens-box-in .12s ease-out',
+            willChange: 'opacity', contain: 'layout style',
           }} />
           {measuring ? (
             <>
