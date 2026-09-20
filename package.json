@@ -1,7 +1,7 @@
 {
   "name": "ds-lens",
   "version": "0.2.0",
-  "description": "Hover any element and see whether it is actually on your design system \u2014 which token, which type role, and which cascade layer won.",
+  "description": "Hover any element and see whether it is actually on your design system — which token, which type role, and which cascade layer won.",
   "keywords": [
     "design-system",
     "design-tokens",
@@ -49,7 +49,8 @@
     "build": "tsup",
     "typecheck": "tsc --noEmit -p tsconfig.json",
     "prepare": "npm run build",
-    "prepublishOnly": "npm run typecheck"
+    "prepublishOnly": "npm run typecheck && npm test",
+    "test": "vitest run"
   },
   "peerDependencies": {
     "react": ">=18",
@@ -69,7 +70,8 @@
     "react": "^19.3.0",
     "react-dom": "^19.3.0",
     "tsup": "^8.5.1",
-    "typescript": "^5.9.3"
+    "typescript": "^5.9.3",
+    "vitest": "^5.0.1"
   },
   "publishConfig": {
     "access": "public"
